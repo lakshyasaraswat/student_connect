@@ -428,16 +428,24 @@ export const ProductHeroShowcase: React.FC<ProductHeroShowcaseProps> = ({
               onClick={() => onOpenLogin && onOpenLogin('student')}
               className="px-4 py-2.5 rounded-lg bg-[#ffffff] hover:bg-[#f5f5f7] text-[#1d1d1f] border border-[#d2d2d7] text-xs font-medium transition flex items-center gap-2 cursor-pointer"
             >
-              <span>Student Login (Username / Admission No)</span>
+              <span>Student Login</span>
             </button>
 
-            {user?.role === 'admin' && (
+            {user?.role === 'admin' ? (
               <button
                 onClick={() => onSelectTab && onSelectTab('admin')}
-                className="px-4 py-2.5 rounded-lg bg-[#f5f5f7] hover:bg-[#e5e5ea] text-[#1d1d1f] border border-[#e5e5ea] text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2.5 rounded-lg bg-[#1d1d1f] hover:bg-black text-white text-xs font-medium transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <IconShield className="w-3.5 h-3.5 text-white" />
+                <span>Campus Moderation Portal</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => onOpenLogin && onOpenLogin('admin')}
+                className="px-4 py-2.5 rounded-lg bg-[#ffffff] hover:bg-[#f5f5f7] text-[#1d1d1f] border border-[#d2d2d7] text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
               >
                 <IconShield className="w-3.5 h-3.5 text-[#1d1d1f]" />
-                <span>Campus Moderation Portal</span>
+                <span>Administrator Login</span>
               </button>
             )}
 
@@ -495,11 +503,10 @@ export const ProductHeroShowcase: React.FC<ProductHeroShowcaseProps> = ({
                     <button
                       key={item.key}
                       onClick={() => setActiveFacility(item.key)}
-                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                        isActive
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${isActive
                           ? 'bg-[#1d1d1f] text-[#ffffff] shadow-xs'
                           : 'bg-[#ffffff] text-[#515154] hover:text-[#1d1d1f] border border-[#e5e5ea]'
-                      }`}
+                        }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
                       <span>{item.label}</span>
@@ -542,11 +549,10 @@ export const ProductHeroShowcase: React.FC<ProductHeroShowcaseProps> = ({
                           setActiveTutorIndex(idx);
                           setSelectedSlot(tutor.availableSlots[0]);
                         }}
-                        className={`p-4 rounded-lg border text-left cursor-pointer transition-colors ${
-                          isSelected
+                        className={`p-4 rounded-lg border text-left cursor-pointer transition-colors ${isSelected
                             ? 'border-[#0071e3] bg-[#fbfbfa]'
                             : 'border-[#e5e5ea] hover:bg-[#fbfbfa]'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-start space-x-3.5">
                           <img
@@ -606,11 +612,10 @@ export const ProductHeroShowcase: React.FC<ProductHeroShowcaseProps> = ({
                             key={slot}
                             type="button"
                             onClick={() => setSelectedSlot(slot)}
-                            className={`px-3 py-2 rounded-md text-xs font-medium border text-center transition-colors cursor-pointer ${
-                              isSlotSelected
+                            className={`px-3 py-2 rounded-md text-xs font-medium border text-center transition-colors cursor-pointer ${isSlotSelected
                                 ? 'border-[#0071e3] bg-[#ffffff] text-[#0071e3] font-semibold'
                                 : 'border-[#e5e5ea] bg-[#ffffff] text-[#515154] hover:border-[#d2d2d7]'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center justify-center space-x-1">
                               <IconClock className="w-3 h-3 text-[#86868b]" />

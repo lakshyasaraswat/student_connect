@@ -85,13 +85,12 @@ const MainContent: React.FC = () => {
           className="fixed top-5 right-5 z-50 max-w-sm w-full transition-all"
         >
           <div
-            className={`p-3.5 rounded-lg border flex items-start justify-between space-x-3 text-xs shadow-lg ${
-              alertMessage.type === 'success'
-                ? 'bg-[#ffffff] text-[#137333] border-[#ceead6]'
-                : alertMessage.type === 'error'
+            className={`p-3.5 rounded-lg border flex items-start justify-between space-x-3 text-xs shadow-lg ${alertMessage.type === 'success'
+              ? 'bg-[#ffffff] text-[#137333] border-[#ceead6]'
+              : alertMessage.type === 'error'
                 ? 'bg-[#ffffff] text-[#c62828] border-[#fad2cf]'
                 : 'bg-[#ffffff] text-[#1967d2] border-[#d2e3fc]'
-            }`}
+              }`}
           >
             <div className="flex items-start space-x-2">
               {alertMessage.type === 'success' && <IconCheck className="w-4 h-4 text-[#137333] mt-0.5 shrink-0" />}
@@ -163,7 +162,7 @@ const MainContent: React.FC = () => {
             {activeTab === 'roommates' && <RoommateView />}
             {activeTab === 'pgs' && <PGListingsView />}
             {activeTab === 'assignments' && <AssignmentHelpView />}
-            {activeTab === 'admin' && user?.role === 'admin' && <AdminView />}
+            {activeTab === 'admin' && user?.role === 'admin' && <AdminView onOpenLogin={handleOpenLogin} />}
           </div>
         </main>
       </div>
@@ -182,6 +181,13 @@ const MainContent: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-4 text-xs font-medium">
+              <button
+                onClick={() => handleOpenLogin('admin')}
+                className="text-[#515154] hover:text-[#1d1d1f] hover:underline cursor-pointer inline-flex items-center gap-1"
+              >
+                <IconShield className="w-3.5 h-3.5 text-[#515154]" />
+                <span>Administrator Login</span>
+              </button>
               <button
                 onClick={() => setLegalModalTab('terms')}
                 className="text-[#515154] hover:text-[#1d1d1f] hover:underline cursor-pointer"

@@ -9,7 +9,7 @@ import { initSocketServer } from './server/sockets/chatSocket.ts';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Basic security and parsing middlewares
   app.use(cors({ origin: '*' }));

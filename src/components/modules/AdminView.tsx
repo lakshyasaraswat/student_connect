@@ -12,7 +12,11 @@ import {
 } from '../icons.tsx';
 import { VerifiedBadge } from '../common/VerifiedBadge.tsx';
 
-export const AdminView: React.FC = () => {
+interface AdminViewProps {
+  onOpenLogin?: (role?: 'student' | 'admin') => void;
+}
+
+export const AdminView: React.FC<AdminViewProps> = ({ onOpenLogin }) => {
   const { user, showAlert } = useAuth();
   const [metrics, setMetrics] = useState<any>(null);
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -108,6 +112,18 @@ export const AdminView: React.FC = () => {
         <p className="text-xs text-[#86868b] mt-2 leading-relaxed">
           This section is restricted to authorized campus staff. Student accounts do not have permission to access administration or moderation records.
         </p>
+        {onOpenLogin && (
+          <div className="mt-5">
+            <button
+              type="button"
+              onClick={() => onOpenLogin('admin')}
+              className="px-4 py-2.5 rounded-lg bg-[#1d1d1f] hover:bg-black text-white text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Sign In as Administrator</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -323,13 +339,12 @@ export const AdminView: React.FC = () => {
                       <td className="py-3 px-3 font-extrabold text-slate-900">₹{tx.amount}</td>
                       <td className="py-3 px-3">
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize ${
-                            tx.status === 'released'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : tx.status === 'refunded'
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize ${tx.status === 'released'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : tx.status === 'refunded'
                               ? 'bg-rose-100 text-rose-800'
                               : 'bg-amber-100 text-amber-800'
-                          }`}
+                            }`}
                         >
                           {tx.status}
                         </span>

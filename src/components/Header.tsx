@@ -58,13 +58,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWallet, onOpenRegister, on
       {alertMessage && (
         <div
           role="status"
-          className={`py-2 px-4 text-center text-xs font-medium tracking-normal transition-all ${
-            alertMessage.type === 'error'
-              ? 'bg-[#ffebee] text-[#c62828]'
-              : alertMessage.type === 'info'
+          className={`py-2 px-4 text-center text-xs font-medium tracking-normal transition-all ${alertMessage.type === 'error'
+            ? 'bg-[#ffebee] text-[#c62828]'
+            : alertMessage.type === 'info'
               ? 'bg-[#e8f0fe] text-[#1967d2]'
               : 'bg-[#e6f4ea] text-[#137333]'
-          }`}
+            }`}
         >
           {alertMessage.text}
         </div>
@@ -116,6 +115,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWallet, onOpenRegister, on
                 className="text-[#0071e3] hover:underline font-semibold cursor-pointer"
               >
                 Student Login
+              </button>
+              <span className="text-[#d2d2d7]">|</span>
+              <button
+                onClick={() => onOpenLogin('admin')}
+                className="text-[#1d1d1f] hover:text-[#0071e3] hover:underline font-medium inline-flex items-center gap-1 cursor-pointer"
+              >
+                <IconShield className="w-3.5 h-3.5 text-[#1d1d1f]" />
+                Administrator Login
               </button>
               <span className="text-[#d2d2d7]">|</span>
               <button
@@ -211,9 +218,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWallet, onOpenRegister, on
                       <div
                         key={n.id}
                         onClick={() => handleNotificationClick(n)}
-                        className={`p-3.5 text-xs transition cursor-pointer hover:bg-[#f5f5f7] ${
-                          !n.read ? 'bg-[#fbfbfa]' : ''
-                        }`}
+                        className={`p-3.5 text-xs transition cursor-pointer hover:bg-[#f5f5f7] ${!n.read ? 'bg-[#fbfbfa]' : ''
+                          }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="font-medium text-[#1d1d1f]">{n.title}</div>
@@ -241,6 +247,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWallet, onOpenRegister, on
                 className="px-3.5 py-1.5 rounded-lg bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-semibold shadow-xs transition cursor-pointer"
               >
                 Log In
+              </button>
+              <button
+                onClick={() => onOpenLogin('admin')}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ffffff] hover:bg-[#f5f5f7] text-[#1d1d1f] border border-[#d2d2d7] text-xs font-medium transition cursor-pointer"
+              >
+                <IconShield className="w-3.5 h-3.5 text-[#1d1d1f]" />
+                <span>Admin Login</span>
               </button>
               <button
                 onClick={onOpenRegister}
@@ -272,99 +285,108 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWallet, onOpenRegister, on
                 </div>
               </button>
 
-            {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-80 bg-[#ffffff] rounded-xl shadow-xl border border-[#e5e5ea] p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-3 py-2.5 border-b border-[#e5e5ea]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-semibold text-[#86868b] tracking-wider">
-                      {user?.role === 'admin' ? 'Administrator Account' : 'Student Account'}
-                    </span>
-                    <VerifiedBadge isVerified={user?.isVerified} role={user?.role} showLabel={true} size="xs" />
-                  </div>
-
-                  <div className="font-semibold text-sm text-[#1d1d1f] mt-1.5 flex items-center gap-1.5">
-                    <span>{user?.name}</span>
-                    <VerifiedBadge isVerified={user?.isVerified} role={user?.role} showLabel={false} size="sm" />
-                  </div>
-                  <div className="text-[11px] text-[#515154] font-mono mt-0.5">
-                    User: @{user?.username || 'user'} • Adm No: {user?.admissionNumber || 'N/A'}
-                  </div>
-                  <div className="text-[11px] text-[#86868b]">{user?.email}</div>
-
-                  <div className="mt-2 text-[11px] text-[#1d1d1f] bg-[#f5f5f7] px-2 py-1 rounded-md font-medium border border-[#e5e5ea]">
-                    🏫 {user?.collegeName}
-                  </div>
-
-                  {user?.isVerified && (
-                    <div className="mt-2 text-[10px] text-emerald-800 bg-emerald-50 px-2 py-1 rounded-md font-medium border border-emerald-200 flex items-center gap-1.5">
-                      <IconVerifiedBadge className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>{user?.idVerificationNotes || 'ID verified & authenticated by Campus Administrator.'}</span>
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-80 bg-[#ffffff] rounded-xl shadow-xl border border-[#e5e5ea] p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-2.5 border-b border-[#e5e5ea]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-semibold text-[#86868b] tracking-wider">
+                        {user?.role === 'admin' ? 'Administrator Account' : 'Student Account'}
+                      </span>
+                      <VerifiedBadge isVerified={user?.isVerified} role={user?.role} showLabel={true} size="xs" />
                     </div>
-                  )}
 
-                  {onOpenProfile && (
+                    <div className="font-semibold text-sm text-[#1d1d1f] mt-1.5 flex items-center gap-1.5">
+                      <span>{user?.name}</span>
+                      <VerifiedBadge isVerified={user?.isVerified} role={user?.role} showLabel={false} size="sm" />
+                    </div>
+                    <div className="text-[11px] text-[#515154] font-mono mt-0.5">
+                      User: @{user?.username || 'user'} • Adm No: {user?.admissionNumber || 'N/A'}
+                    </div>
+                    <div className="text-[11px] text-[#86868b]">{user?.email}</div>
+
+                    <div className="mt-2 text-[11px] text-[#1d1d1f] bg-[#f5f5f7] px-2 py-1 rounded-md font-medium border border-[#e5e5ea]">
+                      🏫 {user?.collegeName}
+                    </div>
+
+                    {user?.isVerified && (
+                      <div className="mt-2 text-[10px] text-emerald-800 bg-emerald-50 px-2 py-1 rounded-md font-medium border border-emerald-200 flex items-center gap-1.5">
+                        <IconVerifiedBadge className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>{user?.idVerificationNotes || 'ID verified & authenticated by Campus Administrator.'}</span>
+                      </div>
+                    )}
+
+                    {onOpenProfile && (
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          onOpenProfile();
+                        }}
+                        className="mt-2 w-full py-1.5 px-3 rounded-lg bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      >
+                        <IconUser className="w-3.5 h-3.5" />
+                        <span>Open Student Profile & ID Status</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Direct Login and Register actions */}
+                  <div className="py-2 border-b border-[#e5e5ea] grid grid-cols-2 gap-1.5 text-xs">
                     <button
                       onClick={() => {
                         setShowUserMenu(false);
-                        onOpenProfile();
+                        onOpenLogin('student');
                       }}
-                      className="mt-2 w-full py-1.5 px-3 rounded-lg bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      className="p-1.5 rounded-lg border border-[#e5e5ea] text-center font-medium hover:bg-[#f5f5f7] text-[#1d1d1f] cursor-pointer flex items-center justify-center gap-1"
                     >
-                      <IconUser className="w-3.5 h-3.5" />
-                      <span>Open Student Profile & ID Status</span>
+                      <span>🎓 Student Login</span>
                     </button>
-                  )}
-                </div>
-
-                {/* Direct Login and Register actions */}
-                <div className="py-2 border-b border-[#e5e5ea] text-xs">
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      onOpenLogin('student');
-                    }}
-                    className="w-full p-1.5 rounded-lg border border-[#e5e5ea] text-center font-medium hover:bg-[#f5f5f7] text-[#1d1d1f] cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <span>🔑 Switch / Student Login</span>
-                  </button>
-                </div>
-
-                {/* Security policy notice */}
-                <div className="mt-2.5 p-2 rounded-lg bg-[#f5f5f7] border border-[#e5e5ea] text-[11px] text-[#515154]">
-                  <div className="font-semibold text-[#1d1d1f] flex items-center gap-1.5 mb-0.5">
-                    <IconShield className="w-3.5 h-3.5 text-[#0071e3]" />
-                    <span>Institutional Security</span>
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        onOpenLogin('admin');
+                      }}
+                      className="p-1.5 rounded-lg border border-[#e5e5ea] text-center font-medium hover:bg-[#f5f5f7] text-[#1d1d1f] cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <span>🛡️ Admin Login</span>
+                    </button>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-[#515154]">
-                    Direct user switching without credentials is disabled. To switch accounts, please sign out and log in with your student or administrator credentials.
-                  </p>
-                </div>
 
-                <div className="mt-2.5 pt-2 border-t border-[#e5e5ea] flex items-center justify-between text-xs px-1">
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      logout();
-                      onOpenLogin('student');
-                    }}
-                    className="text-[#0071e3] hover:underline font-medium text-[11px] cursor-pointer"
-                  >
-                    Switch Account
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      logout();
-                    }}
-                    className="text-[#c62828] hover:underline font-semibold text-[11px] cursor-pointer"
-                  >
-                    Sign Out
-                  </button>
+                  {/* Security policy notice */}
+                  <div className="mt-2.5 p-2 rounded-lg bg-[#f5f5f7] border border-[#e5e5ea] text-[11px] text-[#515154]">
+                    <div className="font-semibold text-[#1d1d1f] flex items-center gap-1.5 mb-0.5">
+                      <IconShield className="w-3.5 h-3.5 text-[#0071e3]" />
+                      <span>Institutional Security</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-[#515154]">
+                      Direct user switching without credentials is disabled. To switch accounts, please sign out and log in with your student or administrator credentials.
+                    </p>
+                  </div>
+
+                  <div className="mt-2.5 pt-2 border-t border-[#e5e5ea] flex items-center justify-between text-xs px-1">
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        logout();
+                        onOpenLogin('student');
+                      }}
+                      className="text-[#0071e3] hover:underline font-medium text-[11px] cursor-pointer"
+                    >
+                      Switch Account
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        logout();
+                      }}
+                      className="text-[#c62828] hover:underline font-semibold text-[11px] cursor-pointer"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>
