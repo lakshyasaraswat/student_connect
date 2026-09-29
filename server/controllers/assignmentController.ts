@@ -13,7 +13,6 @@ import {
 } from '../models/schemas.ts';
 
 export const AssignmentController = {
-  // GET /api/assignments
   async getAssignments(req: AuthenticatedRequest, res: Response) {
     const campusId = req.query.campusId ? String(req.query.campusId) : undefined;
     const status = req.query.status ? String(req.query.status) : undefined;
@@ -52,7 +51,6 @@ export const AssignmentController = {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Bulk-fetch every user referenced (posters, solvers, proposers)
     const allUserIds = new Set<string>();
     list.forEach((a: any) => {
       if (a.studentId) allUserIds.add(a.studentId);
@@ -101,7 +99,6 @@ export const AssignmentController = {
     res.json({ success: true, assignments: enriched });
   },
 
-  // GET /api/assignments/:id
   async getAssignmentById(req: AuthenticatedRequest, res: Response) {
     const id = String(req.params.id);
     const assignment: any = await AssignmentModel.findOne({ id }).lean();
@@ -117,7 +114,6 @@ export const AssignmentController = {
       ? await UserModel.findOne({ id: assignment.solverId }).lean()
       : undefined;
 
-    // Bulk user fetch for proposals
     const proposalIds = (assignment.proposals || []).map(
       (p: any) => p.solverId
     );
@@ -163,7 +159,6 @@ export const AssignmentController = {
     res.json({ success: true, assignment: enriched });
   },
 
-  // POST /api/assignments
   async createAssignment(req: AuthenticatedRequest, res: Response) {
     if (!req.user)
       return res
@@ -273,7 +268,6 @@ export const AssignmentController = {
     });
   },
 
-  // POST /api/assignments/:id/apply
   async applyOrBid(req: AuthenticatedRequest, res: Response) {
     if (!req.user)
       return res
@@ -332,9 +326,7 @@ export const AssignmentController = {
       solverCollege: currentUser.collegeName,
       proposedTime: proposedTime.trim(),
       pitch: pitch.trim(),
-      offeredPrice: offeredPrice
-        ? Number(offeredPrice)
-        : assignment.bounty,
+      offeredPrice: offeredPrice ? Number(offeredPrice) : assignment.bounty,
       status: 'pending' as const,
       createdAt: new Date().toISOString(),
     };
@@ -375,7 +367,6 @@ export const AssignmentController = {
     });
   },
 
-  // POST /api/assignments/:id/claim
   async claimAssignment(req: AuthenticatedRequest, res: Response) {
     if (!req.user)
       return res
@@ -497,7 +488,6 @@ export const AssignmentController = {
     });
   },
 
-  // POST /api/assignments/:id/counter
   async counterOffer(req: AuthenticatedRequest, res: Response) {
     if (!req.user)
       return res
@@ -581,9 +571,7 @@ export const AssignmentController = {
       targetProposal.counterNote = counterNote ? counterNote.trim() : '';
       targetProposal.counterStatus = 'pending';
       targetProposal.counterBy = 'solver';
-      if (proposedTime) {
-        targetProposal.proposedTime = proposedTime.trim();
-      }
+      if (proposedTime) targetProposal.proposedTime = proposedTime.trim();
     }
 
     const prevPrice = assignment.bounty;
@@ -620,7 +608,6 @@ export const AssignmentController = {
     });
   },
 
-  // POST /api/assignments/:id/assign
   async assignSolver(req: AuthenticatedRequest, res: Response) {
     if (!req.user)
       return res
@@ -710,10 +697,7 @@ export const AssignmentController = {
     assignment.assignedAt = new Date().toISOString();
 
     assignment.proposals.forEach((p: any) => {
-      if (
-        p.id === targetProposal.id ||
-        p.solverId === targetProposal.solverId
-      ) {
+      if (p.id === targetProposal.id || p.solverId === targetProposal.solverId) {
         p.status = 'accepted';
         p.counterStatus = 'accepted';
       } else if (p.status === 'pending') {
@@ -769,7 +753,6 @@ export const AssignmentController = {
     });
   },
 
-  // POST /api/assignments/:id/submit
   async submitSolution(req: AuthenticatedRequest, res: Response) {
     if (!req.user)
       return res
@@ -787,8 +770,7 @@ export const AssignmentController = {
     if (!solutionNotes && !solutionFileUrl) {
       return res.status(400).json({
         success: false,
-        message:
-          'Please provide solution notes or upload a solution file.',
+        message: 'Please provide solution notes or upload a solution file.',
       });
     }
 
@@ -857,7 +839,6 @@ export const AssignmentController = {
     });
   },
 
-  // POST /api/assignments/:id/review
   async reviewSolution(req: AuthenticatedRequest, res: Response) {
     if (!req.user)
       return res
@@ -968,3 +949,215 @@ export const AssignmentController = {
       return res.json({
         success: true,
         message: 'Revision request sent to solver.',
+        assignment: assignment.toObject(),
+      });
+    }
+
+    res.status(400).json({
+      success: false,
+      message: 'Invalid action. Must be "approve" or "request_revision".',
+    });
+  },
+
+  async cancelAssignment(req: AuthenticatedRequest, res: Response) {
+    if (!req.user)
+      return res
+        .status(401)
+        .json({ success: false, message: 'Authentication required' });
+
+    const id = String(req.params.id);
+    const assignment: any = await AssignmentModel.findOne({ id });
+    if (!assignment)
+      return res
+        .status(404)
+        .json({ success: false, message: 'Assignment not found.' });
+
+    if (assignment.studentId !== req.user.userId && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized to cancel this assignment.',
+      });
+    }
+
+    if (assignment.status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Completed assignments cannot be cancelled.',
+      });
+    }
+
+    if (assignment.bounty > 0 && assignment.escrowStatus === 'held') {
+      await EscrowService.refundFunds(
+        assignment.id,
+        'Assignment cancelled by poster'
+      );
+      assignment.escrowStatus = 'refunded';
+    }
+
+    assignment.status = 'cancelled';
+    await assignment.save();
+
+    if (assignment.solverId) {
+      const notif = await AppNotificationModel.create({
+        id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        campusId: assignment.campusId,
+        userId: assignment.solverId,
+        type: 'assignment',
+        title: `⚠️ Assignment Cancelled: ${assignment.title}`,
+        message: `The poster has cancelled this assignment.`,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+      sendRealTimeNotification(assignment.solverId, notif.toObject());
+    }
+
+    broadcastAssignmentUpdate(assignment.toObject());
+
+    res.json({
+      success: true,
+      message:
+        'Assignment cancelled. Any held bounty has been refunded to your wallet.',
+      assignment: assignment.toObject(),
+    });
+  },
+
+  async deleteAssignment(req: AuthenticatedRequest, res: Response) {
+    if (!req.user)
+      return res
+        .status(401)
+        .json({ success: false, message: 'Authentication required' });
+
+    const id = String(req.params.id);
+    const assignment: any = await AssignmentModel.findOne({ id }).lean();
+    if (!assignment)
+      return res
+        .status(404)
+        .json({ success: false, message: 'Assignment not found.' });
+
+    if (assignment.studentId !== req.user.userId && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized to delete this assignment.',
+      });
+    }
+
+    if (assignment.bounty > 0 && assignment.escrowStatus === 'held') {
+      await EscrowService.refundFunds(assignment.id, 'Assignment deleted');
+    }
+
+    await AssignmentModel.deleteOne({ id });
+
+    if (assignment.solverId) {
+      sendRealTimeNotification(assignment.solverId, {
+        id: `notif_${Date.now()}`,
+        campusId: assignment.campusId,
+        userId: assignment.solverId,
+        type: 'assignment',
+        title: `Assignment Deleted`,
+        message: `Assignment "${assignment.title}" was removed.`,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    res.json({ success: true, message: 'Assignment removed.' });
+  },
+
+  async addDemoOffer(req: AuthenticatedRequest, res: Response) {
+    try {
+      const id = String(req.params.id);
+      const assignment: any = await AssignmentModel.findOne({ id });
+      if (!assignment) {
+        return res
+          .status(404)
+          .json({ success: false, message: 'Assignment not found.' });
+      }
+
+      if (assignment.status !== 'open') {
+        return res.status(400).json({
+          success: false,
+          message: 'Offers can only be added to open assignments.',
+        });
+      }
+
+      const sampleHelpers = [
+        {
+          name: 'Rohan Sharma',
+          college: 'CS & Engineering, Year 3',
+          avatar:
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+          pitch:
+            'I took this exact course with an A grade. Have sample implementations ready with rigorous unit test suites and detailed explanations.',
+          proposedTime: 'Within 12 hours',
+          price: assignment.bounty,
+        },
+        {
+          name: 'Ananya Deshmukh',
+          college: 'Mathematics & Data Science, Year 4',
+          avatar:
+            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+          pitch:
+            'Skilled in formal proofs and structured code design. Will provide comprehensive documentation and step-by-step logic.',
+          proposedTime: 'Within 18 hours',
+          price: Math.max(100, assignment.bounty - 50),
+        },
+        {
+          name: 'Vikram Seth',
+          college: 'Electrical & Computing, Year 4',
+          avatar:
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+          pitch:
+            'Peer lab tutor for 2 semesters. Will deliver clean verified solutions with comments and test verification runs.',
+          proposedTime: 'Within 24 hours',
+          price: assignment.bounty,
+        },
+      ];
+
+      const pick =
+        sampleHelpers[assignment.proposals.length % sampleHelpers.length];
+
+      const proposal = {
+        id: `prop_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        solverId: `solver_${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(2, 5)}`,
+        solverName: pick.name,
+        solverAvatar: pick.avatar,
+        solverCollege: pick.college,
+        proposedTime: pick.proposedTime,
+        pitch: pick.pitch,
+        offeredPrice: pick.price,
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+      };
+
+      assignment.proposals.push(proposal);
+      await assignment.save();
+
+      sendRealTimeNotification(assignment.studentId, {
+        id: `notif_${Date.now()}`,
+        campusId: assignment.campusId,
+        userId: assignment.studentId,
+        type: 'assignment_bid',
+        title: 'New Offer Received!',
+        message: `${pick.name} gave an offer of ₹${proposal.offeredPrice} on "${assignment.title}". Click Accept Offer to start!`,
+        read: false,
+        createdAt: new Date().toISOString(),
+        data: {
+          assignmentId: assignment.id,
+          proposalId: proposal.id,
+        },
+      });
+
+      return res.json({
+        success: true,
+        message: `Sample offer added from ${pick.name}!`,
+        assignment: assignment.toObject(),
+      });
+    } catch (err: any) {
+      return res
+        .status(500)
+        .json({ success: false, message: err.message });
+    }
+  },
+};
