@@ -1,0 +1,6 @@
+{
+  "name": "Student_Connect",
+  "description": "A campus-locked student networking and resource-sharing platform with carpooling, notes sharing, equipment rental, peer tutoring with escrow, group study, roommate matching, PG listings, and AI Google Maps campus assistant.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
