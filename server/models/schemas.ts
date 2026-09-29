@@ -1,8 +1,7 @@
 // server/models/schemas.ts
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, type SchemaOptions } from 'mongoose';
 
-const opts = {
-    timestamps: true,
+const opts: SchemaOptions = {
     versionKey: false,
     toJSON: {
         transform: (_doc: any, ret: any) => {

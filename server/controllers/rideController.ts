@@ -19,7 +19,9 @@ async function enrichRide(r: any): Promise<any> {
   const passengers = passengerIds.length
     ? await UserModel.find({ id: { $in: passengerIds } }).lean()
     : [];
-  const passengerMap = new Map<string, any>(passengers.map((u: any) => [u.id, u]));
+  const passengerMap = new Map<string, any>(
+    passengers.map((u: any) => [u.id, u])
+  );
 
   return {
     ...doc,
@@ -37,13 +39,23 @@ async function enrichRide(r: any): Promise<any> {
 
 export const RideController = {
   async getRides(req: AuthenticatedRequest, res: Response) {
-    const requestedCampus = req.query.campusId as string;
-    const { source, destination, vehicleType, date } = req.query;
+    const requestedCampus = req.query.campusId
+      ? String(req.query.campusId)
+      : undefined;
+    const source = req.query.source ? String(req.query.source) : undefined;
+    const destination = req.query.destination
+      ? String(req.query.destination)
+      : undefined;
+    const vehicleType = req.query.vehicleType
+      ? String(req.query.vehicleType)
+      : undefined;
+    const date = req.query.date ? String(req.query.date) : undefined;
 
     const filter: any = { status: 'active' };
-    if (requestedCampus && requestedCampus !== 'all') filter.campusId = requestedCampus;
-    if (source) filter.source = { $regex: source as string, $options: 'i' };
-    if (destination) filter.destination = { $regex: destination as string, $options: 'i' };
+    if (requestedCampus && requestedCampus !== 'all')
+      filter.campusId = requestedCampus;
+    if (source) filter.source = { $regex: source, $options: 'i' };
+    if (destination) filter.destination = { $regex: destination, $options: 'i' };
     if (vehicleType && vehicleType !== 'all')
       filter.vehicleType = new RegExp(`^${vehicleType}$`, 'i');
     if (date) filter.date = date;
@@ -55,9 +67,12 @@ export const RideController = {
   },
 
   async getRideById(req: AuthenticatedRequest, res: Response) {
-    const ride = await RideModel.findOne({ id: req.params.id });
+    const id = String(req.params.id);
+    const ride = await RideModel.findOne({ id });
     if (!ride)
-      return res.status(404).json({ success: false, message: 'Ride not found.' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Ride not found.' });
     res.json({ success: true, ride: await enrichRide(ride) });
   },
 
@@ -115,9 +130,12 @@ export const RideController = {
     if (!req.user)
       return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const ride = await RideModel.findOne({ id: req.params.id });
+    const id = String(req.params.id);
+    const ride: any = await RideModel.findOne({ id });
     if (!ride)
-      return res.status(404).json({ success: false, message: 'Ride not found.' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Ride not found.' });
 
     if (ride.driverId === req.user.userId)
       return res.status(400).json({
@@ -155,7 +173,7 @@ export const RideController = {
       seatsBooked: 1,
       status: 'pending',
       requestedAt: new Date().toISOString(),
-    } as any);
+    });
     await ride.save();
 
     const isCrossCollege = Boolean(
@@ -189,7 +207,8 @@ export const RideController = {
 
     res.json({
       success: true,
-      message: 'Join request sent to the driver! You will be notified once accepted.',
+      message:
+        'Join request sent to the driver! You will be notified once accepted.',
       ride: enriched,
     });
   },
@@ -199,9 +218,12 @@ export const RideController = {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     const { passengerId, action } = req.body;
-    const ride = await RideModel.findOne({ id: req.params.id });
+    const id = String(req.params.id);
+    const ride: any = await RideModel.findOne({ id });
     if (!ride)
-      return res.status(404).json({ success: false, message: 'Ride not found.' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Ride not found.' });
 
     if (ride.driverId !== req.user.userId && req.user.role !== 'admin')
       return res.status(403).json({
@@ -224,7 +246,8 @@ export const RideController = {
           message: 'No seats left to accept this passenger.',
         });
       passenger.status = 'accepted';
-      ride.seatsAvailable = (ride.seatsAvailable ?? 0) - (passenger.seatsBooked || 1);
+      ride.seatsAvailable =
+        (ride.seatsAvailable ?? 0) - (passenger.seatsBooked || 1);
       await ride.save();
 
       const notif = await AppNotificationModel.create({
@@ -262,9 +285,12 @@ export const RideController = {
     if (!req.user)
       return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const ride = await RideModel.findOne({ id: req.params.id });
+    const id = String(req.params.id);
+    const ride: any = await RideModel.findOne({ id });
     if (!ride)
-      return res.status(404).json({ success: false, message: 'Ride not found.' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Ride not found.' });
 
     const passengerIndex = ride.passengers.findIndex(
       (p: any) => p.passengerId === req.user!.userId
@@ -315,9 +341,12 @@ export const RideController = {
     if (!req.user)
       return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const ride = await RideModel.findOne({ id: req.params.id });
+    const id = String(req.params.id);
+    const ride = await RideModel.findOne({ id });
     if (!ride)
-      return res.status(404).json({ success: false, message: 'Ride not found.' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Ride not found.' });
 
     if (ride.driverId !== req.user.userId && req.user.role !== 'admin')
       return res.status(403).json({

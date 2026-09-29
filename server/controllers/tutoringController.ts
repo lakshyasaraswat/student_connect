@@ -1,83 +1,118 @@
 import { Response } from 'express';
-import { db } from '../config/db.ts';
 import { AuthenticatedRequest } from '../middlewares/auth.ts';
-import { TutorProfile, TutoringSession } from '../models/types.ts';
+import {
+  TutorProfileModel,
+  TutoringSessionModel,
+  UserModel,
+  AppNotificationModel,
+} from '../models/schemas.ts';
 import { EscrowService } from '../services/escrowService.ts';
 
 export const TutoringController = {
-  getTutors(req: AuthenticatedRequest, res: Response) {
-    const requestedCampus = req.query.campusId as string;
-    const { subject, search } = req.query;
+  async getTutors(req: AuthenticatedRequest, res: Response) {
+    const requestedCampus = req.query.campusId
+      ? String(req.query.campusId)
+      : undefined;
+    const subject = req.query.subject ? String(req.query.subject) : undefined;
+    const search = req.query.search ? String(req.query.search) : undefined;
 
-    let tutors = db.tutors;
-
-    // Filter by campus if explicitly requested and not 'all'
-    if (requestedCampus && requestedCampus !== 'all') {
-      tutors = tutors.filter(t => t.campusId === requestedCampus);
-    }
-
-    if (subject) {
-      tutors = tutors.filter(t => t.subjects.some(s => s.toLowerCase().includes((subject as string).toLowerCase())));
-    }
+    const filter: any = {};
+    if (requestedCampus && requestedCampus !== 'all')
+      filter.campusId = requestedCampus;
+    if (subject) filter.subjects = { $regex: subject, $options: 'i' };
     if (search) {
-      const q = (search as string).toLowerCase();
-      tutors = tutors.filter(t =>
-        t.tutorName.toLowerCase().includes(q) ||
-        (t.collegeName && t.collegeName.toLowerCase().includes(q)) ||
-        t.subjects.some(s => s.toLowerCase().includes(q)) ||
-        t.bio.toLowerCase().includes(q)
-      );
+      const rx = new RegExp(search, 'i');
+      filter.$or = [
+        { tutorName: rx },
+        { collegeName: rx },
+        { subjects: rx },
+        { bio: rx },
+      ];
     }
 
-    // Attach collegeName
-    const enrichedTutors = tutors.map(t => {
-      const u = db.users.find(user => user.id === t.userId);
-      return {
-        ...t,
-        collegeName: t.collegeName || u?.collegeName || 'Verified University'
-      };
-    });
+    const tutors = await TutorProfileModel.find(filter).lean();
+
+    const userIds = Array.from(new Set(tutors.map((t: any) => t.userId)));
+    const users = await UserModel.find({ id: { $in: userIds } }).lean();
+    const userMap = new Map<string, any>(users.map((u: any) => [u.id, u]));
+
+    const enrichedTutors = tutors.map((t: any) => ({
+      ...t,
+      collegeName:
+        t.collegeName ||
+        userMap.get(t.userId)?.collegeName ||
+        'Verified University',
+    }));
 
     res.json({ success: true, tutors: enrichedTutors });
   },
 
-  getSessions(req: AuthenticatedRequest, res: Response) {
-    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  async getSessions(req: AuthenticatedRequest, res: Response) {
+    if (!req.user)
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const mySessions = db.sessions.filter(s =>
-      s.studentId === req.user?.userId ||
-      s.tutorId === req.user?.userId ||
-      db.tutors.some(t => t.id === s.tutorId && t.userId === req.user?.userId) ||
-      req.user?.role === 'admin'
-    );
+    // Find tutor profile IDs owned by this user
+    const tutorProfiles = await TutorProfileModel.find({
+      userId: req.user.userId,
+    }).lean();
+    const myTutorProfileIds = tutorProfiles.map((t: any) => t.id);
+
+    const filter =
+      req.user.role === 'admin'
+        ? {}
+        : {
+          $or: [
+            { studentId: req.user.userId },
+            { tutorId: req.user.userId },
+            { tutorId: { $in: myTutorProfileIds } },
+          ],
+        };
+
+    const mySessions = await TutoringSessionModel.find(filter)
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({ success: true, sessions: mySessions });
   },
 
-  createOrUpdateTutorProfile(req: AuthenticatedRequest, res: Response) {
-    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  async createOrUpdateTutorProfile(
+    req: AuthenticatedRequest,
+    res: Response
+  ) {
+    if (!req.user)
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const user = db.users.find(u => u.id === req.user?.userId);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const user: any = await UserModel.findOne({ id: req.user.userId }).lean();
+    if (!user)
+      return res.status(404).json({ success: false, message: 'User not found' });
 
-    const existingIndex = db.tutors.findIndex(t => t.userId === user.id);
     const { subjects, hourlyRate, bio, availability } = req.body;
+    const subjectsArr = Array.isArray(subjects)
+      ? subjects
+      : subjects
+        ? subjects.split(',').map((s: string) => s.trim())
+        : ['General Tutoring'];
 
-    const subjectsArr = Array.isArray(subjects) ? subjects : (subjects ? subjects.split(',').map((s: string) => s.trim()) : ['General Tutoring']);
+    const existing = await TutorProfileModel.findOne({ userId: user.id });
 
-    if (existingIndex >= 0) {
-      db.tutors[existingIndex] = {
-        ...db.tutors[existingIndex],
-        collegeName: user.collegeName,
-        subjects: subjectsArr,
-        hourlyRate: Number(hourlyRate) || 20,
-        bio: bio || db.tutors[existingIndex].bio,
-        availability: Array.isArray(availability) ? availability : ['Weekdays 4:00 - 8:00 PM']
-      };
-      return res.json({ success: true, message: 'Tutor profile updated for cross-college tutoring.', tutor: db.tutors[existingIndex] });
+    if (existing) {
+      existing.collegeName = user.collegeName;
+      existing.subjects = subjectsArr;
+      existing.hourlyRate = Number(hourlyRate) || 20;
+      existing.bio = bio || existing.bio;
+      existing.availability = Array.isArray(availability)
+        ? availability
+        : ['Weekdays 4:00 - 8:00 PM'];
+      await existing.save();
+
+      return res.json({
+        success: true,
+        message: 'Tutor profile updated for cross-college tutoring.',
+        tutor: existing.toObject(),
+      });
     }
 
-    const newTutor: TutorProfile = {
+    const newTutor = await TutorProfileModel.create({
       id: `tut_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       userId: user.id,
       campusId: user.campusId,
@@ -88,72 +123,103 @@ export const TutoringController = {
       year: user.year || 'Senior',
       subjects: subjectsArr,
       hourlyRate: Number(hourlyRate) || 20,
-      bio: bio || 'Peer tutor ready to help students master challenging coursework.',
+      bio:
+        bio ||
+        'Peer tutor ready to help students master challenging coursework.',
       rating: 5.0,
       reviewsCount: 0,
       sessionsCompleted: 0,
-      availability: Array.isArray(availability) ? availability : ['Flexible by appointment']
-    };
+      availability: Array.isArray(availability)
+        ? availability
+        : ['Flexible by appointment'],
+    });
 
-    db.tutors.unshift(newTutor);
-
-    res.status(201).json({ success: true, message: 'Tutor profile created! Students from all universities can now book tutoring sessions with you.', tutor: newTutor });
+    res.status(201).json({
+      success: true,
+      message:
+        'Tutor profile created! Students from all universities can now book tutoring sessions with you.',
+      tutor: newTutor.toObject(),
+    });
   },
 
-  bookSession(req: AuthenticatedRequest, res: Response) {
-    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  async bookSession(req: AuthenticatedRequest, res: Response) {
+    if (!req.user)
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const { tutorId, subject, date, time, durationHours = 1, sessionType = '1-on-1', notes } = req.body;
-    const tutor = db.tutors.find(t => t.id === tutorId || t.userId === tutorId);
-    if (!tutor) return res.status(404).json({ success: false, message: 'Tutor profile not found.' });
+    const {
+      tutorId,
+      subject,
+      date,
+      time,
+      durationHours = 1,
+      sessionType = '1-on-1',
+      notes,
+    } = req.body;
+
+    const tutor: any = await TutorProfileModel.findOne({
+      $or: [{ id: tutorId }, { userId: tutorId }],
+    });
+    if (!tutor)
+      return res
+        .status(404)
+        .json({ success: false, message: 'Tutor profile not found.' });
 
     if (tutor.userId === req.user.userId) {
-      return res.status(400).json({ success: false, message: 'You cannot book a tutoring session with yourself.' });
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot book a tutoring session with yourself.',
+      });
     }
 
-    const student = db.users.find(u => u.id === req.user?.userId);
-    const tutorUser = db.users.find(u => u.id === tutor.userId);
+    const student: any = await UserModel.findOne({ id: req.user.userId });
+    const tutorUser: any = await UserModel.findOne({ id: tutor.userId }).lean();
     const duration = Number(durationHours) || 1;
     const totalAmount = duration * tutor.hourlyRate;
 
-    // Sandbox wallet topup if balance low
     if (student && student.walletBalance < totalAmount) {
       student.walletBalance += totalAmount + 50;
+      await student.save();
     }
 
     const referenceId = `session_${Date.now()}`;
 
-    // Hold payment in escrow
-    const escrowResult = EscrowService.holdFunds({
+    const escrowResult = await EscrowService.holdFunds({
       campusId: tutor.campusId,
       payerId: req.user.userId,
       payeeId: tutor.userId,
       amount: totalAmount,
       type: 'tutoring_escrow',
       referenceId,
-      note: `Tutoring session for ${subject} (${duration} hrs with ${tutor.tutorName} from ${tutor.collegeName || tutorUser?.collegeName || 'Peer University'})`
+      note: `Tutoring session for ${subject} (${duration} hrs with ${tutor.tutorName} from ${tutor.collegeName || tutorUser?.collegeName || 'Peer University'})`,
     });
 
     if (!escrowResult.success) {
-      return res.status(400).json({ success: false, message: escrowResult.error });
+      return res
+        .status(400)
+        .json({ success: false, message: escrowResult.error });
     }
 
-    // Generate meeting link
     const meetingCode = `meet-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 6)}`;
     const videoCallLink = `https://meet.jit.si/StudentConnect_${meetingCode}`;
 
-    const isCrossCollege = Boolean(student?.collegeName && (tutor.collegeName || tutorUser?.collegeName) && student.collegeName !== (tutor.collegeName || tutorUser?.collegeName));
+    const isCrossCollege = Boolean(
+      student?.collegeName &&
+      (tutor.collegeName || tutorUser?.collegeName) &&
+      student.collegeName !== (tutor.collegeName || tutorUser?.collegeName)
+    );
 
-    const session: TutoringSession = {
+    const session = await TutoringSessionModel.create({
       id: referenceId,
       campusId: tutor.campusId,
       tutorId: tutor.id,
       tutorName: tutor.tutorName,
-      tutorCollege: tutor.collegeName || tutorUser?.collegeName || 'Verified University',
+      tutorCollege:
+        tutor.collegeName || tutorUser?.collegeName || 'Verified University',
       studentId: req.user.userId,
       studentName: student?.name || req.user.name,
       studentAvatar: student?.avatar || '',
-      studentCollege: student?.collegeName || req.user.collegeName || 'Verified University',
+      studentCollege:
+        student?.collegeName || req.user.collegeName || 'Verified University',
       isCrossCollege,
       subject: subject || tutor.subjects[0],
       date,
@@ -165,22 +231,21 @@ export const TutoringController = {
       escrowStatus: 'held',
       videoCallLink,
       notes,
-      createdAt: new Date().toISOString()
-    };
+      createdAt: new Date().toISOString(),
+    });
 
-    db.sessions.unshift(session);
-
-    // Notify tutor
-    db.notifications.unshift({
+    await AppNotificationModel.create({
       id: `notif_${Date.now()}`,
       campusId: tutor.campusId,
       userId: tutor.userId,
       type: 'tutoring',
-      title: isCrossCollege ? 'Cross-College Tutoring Booked!' : 'New Tutoring Session Booked!',
+      title: isCrossCollege
+        ? 'Cross-College Tutoring Booked!'
+        : 'New Tutoring Session Booked!',
       message: `${student?.name} (${student?.collegeName || 'Student'}) booked a ${duration}h session for ${subject} on ${date} at ${time}. $${totalAmount} secured in escrow.`,
       read: false,
       link: '/tutoring',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     });
 
     res.status(201).json({
@@ -188,30 +253,39 @@ export const TutoringController = {
       message: isCrossCollege
         ? `Cross-college tutoring booked with ${tutor.tutorName} (${tutor.collegeName || tutorUser?.collegeName})! $${totalAmount} held in escrow.`
         : `Session booked! $${totalAmount} held safely in escrow until session completion.`,
-      session
+      session: session.toObject(),
     });
   },
 
-  completeSession(req: AuthenticatedRequest, res: Response) {
-    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  async completeSession(req: AuthenticatedRequest, res: Response) {
+    if (!req.user)
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const session = db.sessions.find(s => s.id === req.params.id);
-    if (!session) return res.status(404).json({ success: false, message: 'Session not found.' });
+    const id = String(req.params.id);
+    const session: any = await TutoringSessionModel.findOne({ id });
+    if (!session)
+      return res
+        .status(404)
+        .json({ success: false, message: 'Session not found.' });
 
-    // Release escrow if not already completed
     if (session.status !== 'completed') {
-      const releaseResult = EscrowService.releaseFunds(session.id);
+      const releaseResult = await EscrowService.releaseFunds(session.id);
       if (!releaseResult.success) {
-        return res.status(400).json({ success: false, message: releaseResult.error });
+        return res
+          .status(400)
+          .json({ success: false, message: releaseResult.error });
       }
 
       session.status = 'completed';
       session.escrowStatus = 'released';
+      await session.save();
 
-      // Update tutor stats
-      const tutor = db.tutors.find(t => t.id === session.tutorId || t.userId === session.tutorId);
+      const tutor: any = await TutorProfileModel.findOne({
+        $or: [{ id: session.tutorId }, { userId: session.tutorId }],
+      });
       if (tutor) {
-        tutor.sessionsCompleted += 1;
+        tutor.sessionsCompleted = (tutor.sessionsCompleted || 0) + 1;
+        await tutor.save();
       }
     }
 
@@ -223,39 +297,61 @@ export const TutoringController = {
 
       session.studentRating = numRating;
       session.studentFeedback = feedback || '';
+      await session.save();
 
-      const tutor = db.tutors.find(t => t.id === session.tutorId || t.userId === session.tutorId);
+      const tutor: any = await TutorProfileModel.findOne({
+        $or: [{ id: session.tutorId }, { userId: session.tutorId }],
+      });
       if (tutor) {
         if (isFirstRating) {
-          tutor.reviewsCount += 1;
-          tutor.rating = Number(((tutor.rating * (tutor.reviewsCount - 1) + numRating) / tutor.reviewsCount).toFixed(2));
+          tutor.reviewsCount = (tutor.reviewsCount || 0) + 1;
+          tutor.rating = Number(
+            (
+              (tutor.rating * (tutor.reviewsCount - 1) + numRating) /
+              tutor.reviewsCount
+            ).toFixed(2)
+          );
         } else if (tutor.reviewsCount > 0) {
-          const currentSum = tutor.rating * tutor.reviewsCount - oldRating + numRating;
+          const currentSum =
+            tutor.rating * tutor.reviewsCount - oldRating + numRating;
           tutor.rating = Number((currentSum / tutor.reviewsCount).toFixed(2));
         }
+        await tutor.save();
       }
     }
 
     res.json({
       success: true,
       message: `Session completed! Escrow funds ($${session.amount}) released to ${session.tutorName}.`,
-      session
+      session: session.toObject(),
     });
   },
 
-  rateSession(req: AuthenticatedRequest, res: Response) {
-    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  async rateSession(req: AuthenticatedRequest, res: Response) {
+    if (!req.user)
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const session = db.sessions.find(s => s.id === req.params.id);
-    if (!session) return res.status(404).json({ success: false, message: 'Session not found.' });
+    const id = String(req.params.id);
+    const session: any = await TutoringSessionModel.findOne({ id });
+    if (!session)
+      return res
+        .status(404)
+        .json({ success: false, message: 'Session not found.' });
 
     if (session.studentId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Only the student who booked the session can submit feedback.' });
+      return res.status(403).json({
+        success: false,
+        message:
+          'Only the student who booked the session can submit feedback.',
+      });
     }
 
     const { rating, feedback } = req.body;
     if (!rating) {
-      return res.status(400).json({ success: false, message: 'Star rating (1-5) is required.' });
+      return res.status(400).json({
+        success: false,
+        message: 'Star rating (1-5) is required.',
+      });
     }
 
     const numRating = Math.max(1, Math.min(5, Number(rating)));
@@ -264,44 +360,63 @@ export const TutoringController = {
 
     session.studentRating = numRating;
     session.studentFeedback = feedback || '';
+    await session.save();
 
-    const tutor = db.tutors.find(t => t.id === session.tutorId || t.userId === session.tutorId);
+    const tutor: any = await TutorProfileModel.findOne({
+      $or: [{ id: session.tutorId }, { userId: session.tutorId }],
+    });
     if (tutor) {
       if (isFirstRating) {
-        tutor.reviewsCount += 1;
-        tutor.rating = Number(((tutor.rating * (tutor.reviewsCount - 1) + numRating) / tutor.reviewsCount).toFixed(2));
+        tutor.reviewsCount = (tutor.reviewsCount || 0) + 1;
+        tutor.rating = Number(
+          (
+            (tutor.rating * (tutor.reviewsCount - 1) + numRating) /
+            tutor.reviewsCount
+          ).toFixed(2)
+        );
       } else if (tutor.reviewsCount > 0) {
-        const currentSum = tutor.rating * tutor.reviewsCount - oldRating + numRating;
+        const currentSum =
+          tutor.rating * tutor.reviewsCount - oldRating + numRating;
         tutor.rating = Number((currentSum / tutor.reviewsCount).toFixed(2));
       }
+      await tutor.save();
     }
 
     res.json({
       success: true,
-      message: 'Thank you! Your feedback and star rating have been recorded.',
-      session
+      message:
+        'Thank you! Your feedback and star rating have been recorded.',
+      session: session.toObject(),
     });
   },
 
-  cancelSession(req: AuthenticatedRequest, res: Response) {
-    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  async cancelSession(req: AuthenticatedRequest, res: Response) {
+    if (!req.user)
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const session = db.sessions.find(s => s.id === req.params.id);
-    if (!session) return res.status(404).json({ success: false, message: 'Session not found.' });
+    const id = String(req.params.id);
+    const session: any = await TutoringSessionModel.findOne({ id });
+    if (!session)
+      return res
+        .status(404)
+        .json({ success: false, message: 'Session not found.' });
 
     if (session.status === 'completed') {
-      return res.status(400).json({ success: false, message: 'Completed sessions cannot be cancelled.' });
+      return res.status(400).json({
+        success: false,
+        message: 'Completed sessions cannot be cancelled.',
+      });
     }
 
-    // Refund escrow
-    EscrowService.refundFunds(session.id, 'Session cancelled');
+    await EscrowService.refundFunds(session.id, 'Session cancelled');
     session.status = 'cancelled';
     session.escrowStatus = 'refunded';
+    await session.save();
 
     res.json({
       success: true,
       message: `Session cancelled. $${session.amount} has been refunded to your wallet.`,
-      session
+      session: session.toObject(),
     });
-  }
+  },
 };
