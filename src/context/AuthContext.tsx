@@ -143,18 +143,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return res;
   };
 
-  // use effect
+  // Session expired handler — triggered by api.ts on any 401
   useEffect(() => {
     const handleSessionExpired = () => {
-      // Clear local user state
       setUser(null);
-
-      // Clear cached user (token is already cleared by api.ts)
       try {
         sessionStorage.removeItem('user');
       } catch { }
 
-      // Redirect to login (skip if already there)
       const path = window.location.pathname;
       if (path !== '/' && path !== '/login') {
         window.location.href = '/login';
@@ -188,22 +184,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const meRes = await api.getMe();
           if (meRes.success && meRes.user && isMounted) {
             try {
-              sessionStorage.setItem('user', JSON.stringify(meRes.user));   // ← ADD
+              sessionStorage.setItem('user', JSON.stringify(meRes.user));
             } catch { }
             setUser(meRes.user);
-          } else {
+          } else if (isMounted) {
+            // Server responded but didn't give us a user → not authenticated
             setAuthToken(null);
             try {
-              sessionStorage.removeItem('user');   // ← ADD
+              sessionStorage.removeItem('user');
+            } catch { }
+            setUser(null);
+          }
+        } catch (err: any) {
+          // ⚠️ ONLY clear auth on a genuine 401.
+          // Network blips, HMR races, Strict Mode double-mounts → keep the cached session.
+          if (err?.status === 401 || err?.isAuthError) {
+            setAuthToken(null);
+            try {
+              sessionStorage.removeItem('user');
             } catch { }
             if (isMounted) setUser(null);
           }
-        } catch {
-          setAuthToken(null);
-          try {
-            sessionStorage.removeItem('user');   // ← ADD
-          } catch { }
-          if (isMounted) setUser(null);
+          // else: keep cached session — transient error, not an auth failure
         }
       } catch {
         // Quietly maintain clean guest state
@@ -273,7 +275,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const res = await api.getMe();
       if (res.success && res.user) {
         try {
-          sessionStorage.setItem('user', JSON.stringify(res.user));   // ← ADD
+          sessionStorage.setItem('user', JSON.stringify(res.user));
         } catch { }
         setUser(res.user);
       }
@@ -287,7 +289,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (res.success && res.user) {
       setAuthToken(res.token);
       try {
-        sessionStorage.setItem('user', JSON.stringify(res.user));   // ← ADD
+        sessionStorage.setItem('user', JSON.stringify(res.user));
       } catch { }
       setUser(res.user);
       const roleName = res.user.role === 'admin' ? 'Administrator' : 'Student';
@@ -309,7 +311,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     setAuthToken(null);
     try {
-      sessionStorage.removeItem('user');   // ← ADD
+      sessionStorage.removeItem('user');
     } catch { }
     setUser(null);
     setActiveChat(null);
