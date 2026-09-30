@@ -56,22 +56,22 @@ export const ChatController = {
     }
 
     // Determine target recipient for notifications
-    let recipientUserId: string | null = null;
+    let recipientUserId: string | null | undefined = null;
     let notifTitle = 'New Message';
-    const notifBody = `${msgJson.senderName}: ${msgJson.text.slice(0, 60)}`;
+    const notifBody = `${msgJson.senderName}: ${(msgJson.text || '').slice(0, 60)}`;
 
     if (roomId.startsWith('roommate_')) {
       const postId = roomId.replace('roommate_', '');
       const post = await RoommatePostModel.findOne({ id: postId }).lean();
       if (post && post.userId !== req.user.userId) {
-        recipientUserId = post.userId;
+        recipientUserId = post.userId ?? null;
         notifTitle = `💬 Roommate Message from ${msgJson.senderName}`;
       }
     } else if (roomId.startsWith('listing_')) {
       const listingId = roomId.replace('listing_', '');
       const listing = await PGListingModel.findOne({ id: listingId }).lean();
       if (listing && listing.ownerId !== req.user.userId) {
-        recipientUserId = listing.ownerId;
+        recipientUserId = listing.ownerId ?? null;
         notifTitle = `🏠 Housing Inquiry from ${msgJson.senderName}`;
       }
     } else if (roomId.startsWith('equipment_')) {
@@ -88,7 +88,8 @@ export const ChatController = {
         if (req.user.userId === assignment.studentId && assignment.solverId) {
           recipientUserId = assignment.solverId;
           notifTitle = `📝 Assignment Help: ${assignment.title}`;
-        } else if (req.user.userId !== assignment.studentId) {
+        } else if (req.user.userId !== assignment.studentId &&
+          assignment.studentId) {
           recipientUserId = assignment.studentId;
           notifTitle = `📝 Assignment Help Query from ${msgJson.senderName}`;
         }
