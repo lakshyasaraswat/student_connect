@@ -21,14 +21,12 @@ export async function connectDB(): Promise<void> {
   await mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 });
 }
 
-// ⚠️ TEMPORARY — allows un-migrated controllers to still compile.
-//    Any actual runtime access throws a helpful error pointing to the fix.
-//    DELETE this export once all controllers/services are migrated.
-export const db: any = new Proxy({}, {
+
+/***export const db: any = new Proxy({}, {
   get(_target, prop) {
     throw new Error(
-      `❌ Legacy 'db.${String(prop)}' accessed. ` +
+      `Legacy 'db.${String(prop)}' accessed. ` +
       `Migrate this file to import models from '../models/schemas.ts' instead.`
     );
   },
-});
+});  */

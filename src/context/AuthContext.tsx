@@ -77,7 +77,14 @@ export const DEFAULT_CAMPUSES: CampusConfig[] = [
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const cached = sessionStorage.getItem('user');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [campuses, setCampuses] = useState<CampusConfig[]>(DEFAULT_CAMPUSES);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -126,12 +133,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const registerStudent = async (payload: any) => {
     const res = await api.register(payload);
-    if (res.success && res.token) {
+    if (res.success && res.token && res.user) {
       setAuthToken(res.token);
-      await refreshUser();
+      try {
+        sessionStorage.setItem('user', JSON.stringify(res.user));
+      } catch { }
+      setUser(res.user);
     }
     return res;
   };
+
+  // use effect
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      // Clear local user state
+      setUser(null);
+
+      // Clear cached user (token is already cleared by api.ts)
+      try {
+        sessionStorage.removeItem('user');
+      } catch { }
+
+      // Redirect to login (skip if already there)
+      const path = window.location.pathname;
+      if (path !== '/' && path !== '/login') {
+        window.location.href = '/login';
+      }
+    };
+
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('auth:session-expired', handleSessionExpired);
+    };
+  }, []);
 
   // 1. Initial Load: fetch campuses and restore session
   useEffect(() => {
@@ -153,13 +187,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           const meRes = await api.getMe();
           if (meRes.success && meRes.user && isMounted) {
+            try {
+              sessionStorage.setItem('user', JSON.stringify(meRes.user));   // ← ADD
+            } catch { }
             setUser(meRes.user);
           } else {
             setAuthToken(null);
+            try {
+              sessionStorage.removeItem('user');   // ← ADD
+            } catch { }
             if (isMounted) setUser(null);
           }
         } catch {
           setAuthToken(null);
+          try {
+            sessionStorage.removeItem('user');   // ← ADD
+          } catch { }
           if (isMounted) setUser(null);
         }
       } catch {
@@ -215,7 +258,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setUnreadCount(res.unreadCount);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     } catch {
       // Ignore socket setup failures in offline or restricted environments
     }
@@ -229,6 +272,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const res = await api.getMe();
       if (res.success && res.user) {
+        try {
+          sessionStorage.setItem('user', JSON.stringify(res.user));   // ← ADD
+        } catch { }
         setUser(res.user);
       }
     } catch {
@@ -240,16 +286,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const res = await api.login(credentials);
     if (res.success && res.user) {
       setAuthToken(res.token);
+      try {
+        sessionStorage.setItem('user', JSON.stringify(res.user));   // ← ADD
+      } catch { }
       setUser(res.user);
       const roleName = res.user.role === 'admin' ? 'Administrator' : 'Student';
       showAlert(`Welcome back, ${res.user.name}! Logged in as ${roleName} (${res.user.collegeName}).`, 'success');
-      // Refresh notifications
       api.getNotifications().then(notifRes => {
         if (notifRes.success) {
           setNotifications(notifRes.notifications);
           setUnreadCount(notifRes.unreadCount);
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
     return res;
   };
@@ -260,6 +308,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     setAuthToken(null);
+    try {
+      sessionStorage.removeItem('user');   // ← ADD
+    } catch { }
     setUser(null);
     setActiveChat(null);
     setNotifications([]);
@@ -303,10 +354,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const currentCampus = campuses.find(
     c => c.id === user?.campusId ||
-         c.id === `campus_${user?.campusId}` ||
-         c.id.replace('campus_', '') === user?.campusId?.replace('campus_', '') ||
-         (user?.collegeName && c.name.toLowerCase() === user?.collegeName?.toLowerCase()) ||
-         (user?.domain && c.domain.toLowerCase() === user?.domain?.toLowerCase())
+      c.id === `campus_${user?.campusId}` ||
+      c.id.replace('campus_', '') === user?.campusId?.replace('campus_', '') ||
+      (user?.collegeName && c.name.toLowerCase() === user?.collegeName?.toLowerCase()) ||
+      (user?.domain && c.domain.toLowerCase() === user?.domain?.toLowerCase())
   ) || campuses[0] || null;
 
   return (

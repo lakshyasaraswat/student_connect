@@ -2,7 +2,7 @@ const API_BASE = '/api';
 
 function getAuthToken(): string | null {
   try {
-    return localStorage.getItem('student_connect_token');
+    return sessionStorage.getItem('student_connect_token');
   } catch {
     return null;
   }
@@ -11,9 +11,9 @@ function getAuthToken(): string | null {
 export function setAuthToken(token: string | null) {
   try {
     if (token) {
-      localStorage.setItem('student_connect_token', token);
+      sessionStorage.setItem('student_connect_token', token);
     } else {
-      localStorage.removeItem('student_connect_token');
+      sessionStorage.removeItem('student_connect_token');
     }
   } catch {
     // Gracefully handle storage quota or security restrictions in iframe
@@ -48,6 +48,25 @@ async function request<T>(endpoint: string, options: RequestInit = {}, retries =
       } catch {
         data = { success: response.ok, message: text };
       }
+    }
+
+    if (response.status === 401) {
+      try {
+        sessionStorage.removeItem('student_connect_token');
+        sessionStorage.removeItem('user');
+      } catch {
+        // ignore
+      }
+
+      // Let AuthContext know so it can redirect
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:session-expired'));
+      }
+
+      const err: any = new Error(data?.message || 'Authentication required. Please log in.');
+      err.status = 401;
+      err.isAuthError = true;
+      throw err;
     }
 
     if (!response.ok) {
