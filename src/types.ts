@@ -1,4 +1,4 @@
-export interface User {
+﻿export interface User {
   id: string;
   name: string;
   username?: string;
@@ -223,6 +223,19 @@ export interface StudyGroupSchedule {
   location: string;
 }
 
+export interface StudyGroupJoinRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  userCollege?: string;
+  course?: string;
+  message?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string;
+  respondedAt?: string;
+}
+
 export interface StudyGroup {
   id: string;
   campusId: string;
@@ -236,9 +249,14 @@ export interface StudyGroup {
   maxMembers: number;
   type: 'public' | 'private';
   locationType: 'Online' | 'Campus Library' | 'Hostel Common Room' | 'Lab';
+  isMember?: boolean;
+  isCreator?: boolean;
+  myRequestStatus?: 'pending' | 'approved' | 'rejected' | null;
+  pendingRequestsCount?: number;
   members: StudyGroupMember[];
   schedule: StudyGroupSchedule[];
   resources: StudyGroupResource[];
+  joinRequests?: StudyGroupJoinRequest[];
   createdAt: string;
 }
 

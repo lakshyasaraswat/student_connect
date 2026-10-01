@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, DEFAULT_CAMPUSES } from '../context/AuthContext.tsx';
+import { useAuth } from '../context/AuthContext.tsx';
+import { DEFAULT_CAMPUSES } from '../constants/campuses.ts';
 import {
   IconGraduation,
   IconShield,

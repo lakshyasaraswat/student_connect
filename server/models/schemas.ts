@@ -543,6 +543,20 @@ export interface StudyGroupScheduleDoc {
     location?: string;
 }
 
+export interface StudyGroupJoinRequestDoc {
+    id: string;
+    userId: string;
+    userName: string;
+    userAvatar?: string;
+    userCollege?: string;
+    course?: string;
+    message?: string;
+    status: 'pending' | 'approved' | 'rejected';
+    requestedAt: string;
+    respondedAt?: string;
+}
+
+
 export interface StudyGroupDoc {
     id: string;
     campusId?: string;
@@ -559,6 +573,7 @@ export interface StudyGroupDoc {
     members: StudyGroupMemberDoc[];
     schedule: StudyGroupScheduleDoc[];
     resources: StudyGroupResourceDoc[];
+    joinRequests: StudyGroupJoinRequestDoc[];
     createdAt: string;
 }
 
@@ -581,6 +596,27 @@ const StudyGroupResourceSchema = new Schema<StudyGroupResourceDoc>(
         type: { type: String, enum: ['pdf', 'doc', 'link', 'code'] },
         uploadedBy: String,
         date: String,
+    },
+    { _id: false }
+);
+
+const StudyGroupJoinRequestSchema = new Schema<StudyGroupJoinRequestDoc>(
+    {
+        id: { type: String, required: true },
+        userId: { type: String, required: true },
+        userName: { type: String, required: true },
+        userAvatar: String,
+        userCollege: String,
+        course: String,
+        message: String,
+        status: {
+            type: String,
+            required: true,
+            enum: ['pending', 'approved', 'rejected'],
+            default: 'pending',
+        },
+        requestedAt: { type: String, required: true },
+        respondedAt: String,
     },
     { _id: false }
 );
@@ -616,6 +652,7 @@ const StudyGroupSchema = new Schema<StudyGroupDoc>(
         members: { type: [StudyGroupMemberSchema], default: [] },
         schedule: { type: [StudyGroupScheduleSchema], default: [] },
         resources: { type: [StudyGroupResourceSchema], default: [] },
+        joinRequests: { type: [StudyGroupJoinRequestSchema], default: [] },
         createdAt: String,
     },
     opts

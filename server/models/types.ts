@@ -198,6 +198,18 @@ export interface StudyGroupMember {
   joinedAt: string;
 }
 
+export interface StudyGroupJoinRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  collegeName?: string;
+  course?: string;
+  message?: string;
+  requestedAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
 export interface StudyGroupResource {
   id: string;
   title: string;
@@ -229,6 +241,7 @@ export interface StudyGroup {
   type: 'public' | 'private';
   locationType: 'Online' | 'Campus Library' | 'Hostel Common Room' | 'Lab';
   members: StudyGroupMember[];
+  joinRequests?: StudyGroupJoinRequest[];
   schedule: StudyGroupSchedule[];
   resources: StudyGroupResource[];
   createdAt: string;

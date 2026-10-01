@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { io, Socket } from 'socket.io-client';
 import { User, CampusConfig, AppNotification } from '../types.ts';
 import { api, setAuthToken } from '../services/api.ts';
+import { DEFAULT_CAMPUSES } from '../constants/campuses.ts';
 
 interface AuthContextType {
   user: User | null;
@@ -31,48 +32,6 @@ interface AuthContextType {
   registerStudent: (payload: any) => Promise<any>;
 }
 
-export const DEFAULT_CAMPUSES: CampusConfig[] = [
-  {
-    id: 'campus_stanford',
-    name: 'Stanford University',
-    domain: 'stanford.edu',
-    city: 'Stanford',
-    state: 'CA',
-    centerCoordinates: { lat: 37.4275, lng: -122.1697 }
-  },
-  {
-    id: 'campus_berkeley',
-    name: 'UC Berkeley',
-    domain: 'berkeley.edu',
-    city: 'Berkeley',
-    state: 'CA',
-    centerCoordinates: { lat: 37.8719, lng: -122.2585 }
-  },
-  {
-    id: 'campus_mit',
-    name: 'Massachusetts Institute of Technology',
-    domain: 'mit.edu',
-    city: 'Cambridge',
-    state: 'MA',
-    centerCoordinates: { lat: 42.3601, lng: -71.0942 }
-  },
-  {
-    id: 'campus_iitd',
-    name: 'IIT Delhi',
-    domain: 'iitd.ac.in',
-    city: 'New Delhi',
-    state: 'DL',
-    centerCoordinates: { lat: 28.545, lng: 77.1926 }
-  },
-  {
-    id: 'campus_cmu',
-    name: 'Carnegie Mellon University',
-    domain: 'cmu.edu',
-    city: 'Pittsburgh',
-    state: 'PA',
-    centerCoordinates: { lat: 40.4432, lng: -79.9428 }
-  }
-];
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

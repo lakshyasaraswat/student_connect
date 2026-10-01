@@ -150,17 +150,41 @@ export const api = {
     request<any>(`/tutoring/sessions/${id}/rate`, { method: 'POST', body: JSON.stringify({ rating, feedback }) }),
   cancelSession: (id: string) => request<any>(`/tutoring/sessions/${id}/cancel`, { method: 'POST' }),
 
+
   // Study Groups
   getStudyGroups: (params?: Record<string, string>) => {
     const query = new URLSearchParams(params).toString();
     return request<any>(`/study-groups${query ? `?${query}` : ''}`);
   },
-  createStudyGroup: (data: any) => request<any>('/study-groups', { method: 'POST', body: JSON.stringify(data) }),
-  deleteStudyGroup: (id: string) => request<any>(`/study-groups/${id}`, { method: 'DELETE' }),
-  joinStudyGroup: (id: string) => request<any>(`/study-groups/${id}/join`, { method: 'POST' }),
-  leaveStudyGroup: (id: string) => request<any>(`/study-groups/${id}/leave`, { method: 'POST' }),
-  addStudyResource: (id: string, data: any) => request<any>(`/study-groups/${id}/resources`, { method: 'POST', body: JSON.stringify(data) }),
-  addStudySchedule: (id: string, data: any) => request<any>(`/study-groups/${id}/schedule`, { method: 'POST', body: JSON.stringify(data) }),
+  createStudyGroup: (data: any) =>
+    request<any>('/study-groups', { method: 'POST', body: JSON.stringify(data) }),
+  deleteStudyGroup: (id: string) =>
+    request<any>(`/study-groups/${id}`, { method: 'DELETE' }),
+  joinStudyGroup: (id: string, data?: { message?: string }) =>
+    request<any>(`/study-groups/${id}/join`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+  cancelStudyGroupRequest: (id: string) =>
+    request<any>(`/study-groups/${id}/cancel-request`, { method: 'POST' }),
+  respondToStudyGroupRequest: (id: string, requestId: string, action: 'approve' | 'reject') =>
+    request<any>(`/study-groups/${id}/requests/${requestId}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
+  leaveStudyGroup: (id: string) =>
+    request<any>(`/study-groups/${id}/leave`, { method: 'POST' }),
+  addStudyResource: (id: string, data: any) =>
+    request<any>(`/study-groups/${id}/resources`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  addStudySchedule: (id: string, data: any) =>
+    request<any>(`/study-groups/${id}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
 
   // Roommates
   getRoommates: (params?: Record<string, string>) => {
