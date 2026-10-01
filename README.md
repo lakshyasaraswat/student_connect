@@ -21,17 +21,9 @@ Built end-to-end in **TypeScript** on the **MERN** stack.
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [Environment Variables](#environment-variables)
-- [Available Scripts](#available-scripts)
-- [API Overview](#api-overview)
+- [Getting Started](#getting-started)`
 - [Escrow System](#escrow-system)
-- [Multi-Campus Isolation](#multi-campus-isolation)
 - [Authentication](#authentication)
-- [Real-Time Layer](#real-time-layer)
-- [Database Schema](#database-schema)
-- [Roadmap](#roadmap)
-- [License](#license)
 
 ---
 
@@ -124,3 +116,39 @@ npm install
 # Copy the environment template
 cp .env.example .env
 # Then edit .env with your MongoDB URI and JWT secret
+
+Escrow System
+Every paid transaction — tutoring sessions, equipment rentals, note purchases, assignment bounties — flows through a MongoDB-backed escrow ledger.
+
+State Machine
+   ┌────────┐  holdFunds()  ┌──────┐  releaseFunds()  ┌──────────┐
+   │ Wallet │ ────────────► │ Held │ ───────────────► │ Released │
+   └────────┘               └──┬───┘                  └──────────┘
+                               │
+                               │ refundFunds()
+                               ▼
+                          ┌──────────┐
+                          │ Refunded │
+                          └──────────┘
+
+Authentication
+JWT (HS256) signed with JWT_SECRET.
+
+Token stored in sessionStorage — survives refresh, cleared on tab close.
+
+Client-side 401 handling: any 401 response clears the token and dispatches a global auth:session-expired event. AuthContext listens for it and redirects to login.
+
+Registration flow: college email → OTP → verify + upload ID → admin approval.
+
+
+
+Real-Time Layer
+Socket.io runs on the same HTTP server as Express and shares the same Mongoose models.
+
+Rooms for chat: group_<groupId>, roommate_<postId>, listing_<listingId>, assignment_<assignmentId>
+
+User channels for notifications: user_<userId>
+
+Auto-reconnect with 5 attempts and 10s timeout
+
+Deduplication by message id on the client to prevent double-renders
