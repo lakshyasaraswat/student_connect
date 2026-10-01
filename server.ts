@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import cors from 'cors';
-import mongoose from 'mongoose';                          // ← add
+import mongoose from 'mongoose';
 import { createServer as createViteServer } from 'vite';
 import apiRouter from './server/routes/api.ts';
 import { errorHandler } from './server/middlewares/errorHandler.ts';
@@ -13,7 +13,7 @@ import { connectDB } from './server/config/db.ts';
 import { seedIfEmpty } from './server/config/seed.ts';
 
 async function startServer() {
-  // ✅ Connect to MongoDB FIRST — before routes touch the DB
+  // ✅ Connect to MongoDB FIRST
   await connectDB();
   await seedIfEmpty();
 
@@ -27,10 +27,10 @@ async function startServer() {
   const httpServer = http.createServer(app);
   initSocketServer(httpServer);
 
-  // Health check — verify DB connection in the browser
+  // Health check
   app.get('/health/db', (_req, res) => {
     res.json({
-      readyState: mongoose.connection.readyState,   // 1 = connected
+      readyState: mongoose.connection.readyState,
       host: mongoose.connection.host,
       db: mongoose.connection.name,
     });
